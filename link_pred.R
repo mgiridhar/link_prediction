@@ -120,7 +120,7 @@ cos_text <- function(x,y)
 }
 
 splitTrain <- function(data) {
-  size <- nrow(data) * 0.7
+  size <- nrow(data) * 0.8
   validation_index <- sample(1:nrow(data), size = size)
   validation <- data[-validation_index,]
   train <- data[validation_index,]
@@ -223,3 +223,146 @@ confusion.matrix = prop.table(table(predictions, test$label))
 accuracy <- confusion.matrix[1,1] + confusion.matrix[2,2]
 accuracy
 #[1] 0.8728
+
+### RANDOM FORESTS - Accuracy Vs Training Examples
+accVsEx = data.frame(examples = numeric(7),
+                     accuracy = numeric(7),
+                     runtime = numeric(7))
+set.seed(50)
+accVsEx$examples = c(10000, 15000, 20000, 25000, 30000, 35000, 40000)
+for(i in 1:length(accVsEx$examples)){
+  #print(i)
+  #print(accVsEx$examples[i])
+  ptm <- proc.time()
+  rf = randomForest(label~., data = train[1:accVsEx$examples[i],], importance = TRUE, ntree = 1500)
+  accVsEx$runtime[i] = proc.time() - ptm
+  predictions = predict(rf, subset(test, select = -label))
+  confusion.matrix = prop.table(table(predictions, test$label))
+  accuracy <- confusion.matrix[1,1] + confusion.matrix[2,2]
+  accVsEx$accuracy[i] = accuracy * 100
+}
+
+
+library(ggplot2)
+library(gtable)
+library(grid)
+library(extrafont)
+
+# Create p1
+p1 <- ggplot(accVsEx, aes(examples, runtime)) + 
+  geom_line(colour = "blue4", size = 1) + geom_point(colour = "blue4", size = 2) +
+  labs(x="Number of Training Examples",y=NULL) +
+  scale_x_continuous(breaks = accVsEx$examples) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,10)) +
+  theme(
+    # panel.background = element_blank(),
+    # panel.grid.minor = element_blank(), 
+    # panel.grid.major = element_line(color = "gray50", size = 0.75),
+    # panel.grid.major.x = element_blank(),
+    axis.text.y = element_text(colour="blue4", size = 10),
+    axis.text.x = element_text(size = 10, colour = "black"),
+    # axis.ticks = element_line(colour = 'gray50'),
+    # axis.ticks.length = unit(.2, "cm"),
+    # axis.ticks.x = element_line(colour = "black"),
+    # axis.ticks.y = element_blank(),
+    plot.title = element_text(hjust = -0.135, vjust=2.12, colour="blue4", size = 10)) 
+
+# Create p2
+p2 <- ggplot(accVsEx, aes(examples, accuracy)) + 
+  geom_line(colour = "chartreuse4", size = 1) +  geom_point(colour = "chartreuse4", size = 2) +
+  labs(x="Number of Training Examples",y=NULL) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100)) +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text.y = element_text(colour="chartreuse4", size=10),
+    axis.text.x = element_text(size=10),
+    #axis.ticks.length = unit(.2, "cm"),
+    #axis.ticks.y = element_blank(),
+    plot.title = element_text(hjust = 0.6, vjust=2.12, colour = "chartreuse4", size = 10))
+
+# Get the plot grobs
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+
+# Get the locations of the plot panels in g1.
+pp <- c(subset(g1$layout, name == "panel", se = t:r))
+
+# Overlap panel for second plot on that of the first plot
+g1 <- gtable_add_grob(g1, g2$grobs[[which(g2$layout$name == "panel")]], pp$t, pp$l, pp$b, pp$l)
+
+# ggplot contains many labels that are themselves complex grob; 
+# usually a text grob surrounded by margins.
+# When moving the grobs from, say, the left to the right of a plot,
+# make sure the margins and the justifications are swapped around.
+# The function below does the swapping.
+# Taken from the cowplot package:
+# https://github.com/wilkelab/cowplot/blob/master/R/switch_axis.R 
+hinvert_title_grob <- function(grob){
+  
+  # Swap the widths
+  widths <- grob$widths
+  grob$widths[1] <- widths[3]
+  grob$widths[3] <- widths[1]
+  grob$vp[[1]]$layout$widths[1] <- widths[3]
+  grob$vp[[1]]$layout$widths[3] <- widths[1]
+  
+  # Fix the justification
+  grob$children[[1]]$hjust <- 1 - grob$children[[1]]$hjust 
+  grob$children[[1]]$vjust <- 1 - grob$children[[1]]$vjust 
+  grob$children[[1]]$x <- unit(1, "npc") - grob$children[[1]]$x
+  grob
+}
+
+# Get the y axis from g2 (axis line, tick marks, and tick mark labels)
+index <- which(g2$layout$name == "axis-l")  # Which grob
+yaxis <- g2$grobs[[index]]                  # Extract the grob
+
+# yaxis is a complex of grobs containing the axis line, the tick marks, and the tick mark labels.
+# The relevant grobs are contained in axis$children:
+#   axis$children[[1]] contains the axis line;
+#   axis$children[[2]] contains the tick marks and tick mark labels.
+
+# Second, swap tick marks and tick mark labels
+ticks <- yaxis$children[[2]]
+ticks$widths <- rev(ticks$widths)
+ticks$grobs <- rev(ticks$grobs)
+
+# Third, move the tick marks
+# Tick mark lengths can change. 
+# A function to get the original tick mark length
+# Taken from the cowplot package:
+# https://github.com/wilkelab/cowplot/blob/master/R/switch_axis.R 
+plot_theme <- function(p) {
+  plyr::defaults(p$theme, theme_get())
+}
+
+tml <- plot_theme(p1)$axis.ticks.length   # Tick mark length
+ticks$grobs[[1]]$x <- ticks$grobs[[1]]$x - unit(1, "npc") + tml
+
+# Fourth, swap margins and fix justifications for the tick mark labels
+ticks$grobs[[2]] <- hinvert_title_grob(ticks$grobs[[2]])
+
+# Fifth, put ticks back into yaxis
+yaxis$children[[2]] <- ticks
+
+# Put the transformed yaxis on the right side of g1
+g1 <- gtable_add_cols(g1, g2$widths[g2$layout[index, ]$l], pp$r)
+g1 <- gtable_add_grob(g1, yaxis, pp$t, pp$r + 1, pp$b, pp$r + 1, clip = "off", name = "axis-r")
+
+# Labels grob
+left = textGrob("Training Time (seconds)", x = 0, y = 0.9, just = c("left", "top"), gp = gpar(fontsize = 12, col =  "blue4"))
+right =  textGrob("Validation Accuracy (%)", x = 1, y = 0.9, just = c("right", "top"), gp = gpar(fontsize = 12, col =  "chartreuse4"))
+labs = gTree("Labs", children = gList(left, right))
+
+# New row in the gtable for labels
+height = unit(3, "grobheight", left)
+g1 <- gtable_add_rows(g1, height, 2)  
+
+# Put the label in the new row
+g1 = gtable_add_grob(g1, labs, t=3, l=3, r=5)
+
+# Turn off clipping in the plot panel
+g1$layout[which(g1$layout$name == "panel"), ]$clip = "off"
+grid.draw(g1)
