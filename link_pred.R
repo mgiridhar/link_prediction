@@ -229,7 +229,7 @@ accVsEx = data.frame(examples = numeric(7),
                      accuracy = numeric(7),
                      runtime = numeric(7))
 set.seed(50)
-accVsEx$examples = c(10000, 15000, 20000, 25000, 30000, 35000, 40000)
+accVsEx$examples = c(00, 500, 1000, 2500, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000)
 for(i in 1:length(accVsEx$examples)){
   #print(i)
   #print(accVsEx$examples[i])
@@ -242,18 +242,19 @@ for(i in 1:length(accVsEx$examples)){
   accVsEx$accuracy[i] = accuracy * 100
 }
 
-
+### plot for anlysing random forest performance
+### number of training examples VS training time and validation accuracy
 library(ggplot2)
 library(gtable)
 library(grid)
 library(extrafont)
 
 # Create p1
-p1 <- ggplot(accVsEx, aes(examples, runtime)) + 
+p1 <- ggplot(accVsEx, aes(as.factor(examples), runtime, group = 1)) + 
   geom_line(colour = "blue4", size = 1) + geom_point(colour = "blue4", size = 2) +
   labs(x="Number of Training Examples",y=NULL) +
-  scale_x_continuous(breaks = accVsEx$examples) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0,10)) +
+  scale_x_discrete(breaks = accVsEx$examples) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,300)) +
   theme(
     # panel.background = element_blank(),
     # panel.grid.minor = element_blank(), 
@@ -265,13 +266,15 @@ p1 <- ggplot(accVsEx, aes(examples, runtime)) +
     # axis.ticks.length = unit(.2, "cm"),
     # axis.ticks.x = element_line(colour = "black"),
     # axis.ticks.y = element_blank(),
+    axis.title=element_text(size=14,face="bold"),
     plot.title = element_text(hjust = -0.135, vjust=2.12, colour="blue4", size = 10)) 
 
 # Create p2
-p2 <- ggplot(accVsEx, aes(examples, accuracy)) + 
+p2 <- ggplot(accVsEx, aes(as.factor(examples), accuracy, group = 1)) + 
   geom_line(colour = "chartreuse4", size = 1) +  geom_point(colour = "chartreuse4", size = 2) +
   labs(x="Number of Training Examples",y=NULL) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0,100)) +
+  scale_x_discrete(breaks = accVsEx$examples) +
+  scale_y_continuous(expand = c(0, 0), limits = c(80,90)) +
   theme(
     panel.background = element_blank(),
     panel.grid.minor = element_blank(),
@@ -280,6 +283,7 @@ p2 <- ggplot(accVsEx, aes(examples, accuracy)) +
     axis.text.x = element_text(size=10),
     #axis.ticks.length = unit(.2, "cm"),
     #axis.ticks.y = element_blank(),
+    axis.title=element_text(size=14,face="bold"),
     plot.title = element_text(hjust = 0.6, vjust=2.12, colour = "chartreuse4", size = 10))
 
 # Get the plot grobs
@@ -352,8 +356,8 @@ g1 <- gtable_add_cols(g1, g2$widths[g2$layout[index, ]$l], pp$r)
 g1 <- gtable_add_grob(g1, yaxis, pp$t, pp$r + 1, pp$b, pp$r + 1, clip = "off", name = "axis-r")
 
 # Labels grob
-left = textGrob("Training Time (seconds)", x = 0, y = 0.9, just = c("left", "top"), gp = gpar(fontsize = 12, col =  "blue4"))
-right =  textGrob("Validation Accuracy (%)", x = 1, y = 0.9, just = c("right", "top"), gp = gpar(fontsize = 12, col =  "chartreuse4"))
+left = textGrob("Training Time (seconds)", x = 0, y = 0.9, just = c("left", "top"), gp = gpar(fontsize = 14, fontface="bold", col =  "blue4"))
+right =  textGrob("Validation Accuracy (%)", x = 1, y = 0.9, just = c("right", "top"), gp = gpar(fontsize = 14, fontface="bold", col =  "chartreuse4"))
 labs = gTree("Labs", children = gList(left, right))
 
 # New row in the gtable for labels
